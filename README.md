@@ -1,157 +1,41 @@
-# Automatização - **Wordfence malware-scan + Email**
+# 🔐 Wordfence CLI Scan Automation + Email & Discord Notification
 
-![wordfence](image/wordfence.png)
+![Wordfence](image/wordfence.png)
 
-## 🧠 **O que esse script faz?**
-
-Ele verifica se o seu site WordPress está com arquivos maliciosos usando uma ferramenta chamada **Wordfence** (versão para linha de comando) e envia um relatório por e-mail para algumas pessoas.
+Este script realiza varreduras de segurança em instalações WordPress usando o **Wordfence CLI**, envia relatórios por **e-mail** e também notifica via **Discord webhook**. Ideal para administradores que desejam monitorar a integridade de seus sites automaticamente.
 
 ---
 
-# 💽 **SCRIPT DA AUTOMAÇÃO**
+## 🧠 O que esse script faz?
 
-### 🧰 **Configurações Básicas**
+- Executa uma varredura de malware com o Wordfence CLI.
+- Gera um relatório com os principais alertas e arquivos suspeitos.
+- Envia esse relatório por e-mail.
+- Notifica via Discord (se o relatório tiver até 2000 caracteres).
+- Registra logs locais para auditoria.
 
-- `WP_PATH`: Caminho onde está instalada a sua instância WordPress.
-- `EMAIL_TO`: Lista de e-mails que vão receber o relatório da varredura.
-- `LOG_FILE`: Caminho onde o log da varredura será salvo.
-- `EMAIL_SUBJECT`: Assunto do e-mail, incluindo a data e hora atual.
-- `CONFIG_FILE`: Caminho do arquivo `.ini` usado para configurar o Wordfence CLI.
-  
-```bash
+---
+
+## ⚙️ Configurações Básicas
+
+Você pode configurar os seguintes parâmetros diretamente no script ou via arquivo `.env`:
+
+| Variável          | Descrição                                   |
+| ----------------- | ------------------------------------------- |
+| `WP_PATH`         | Caminho da instalação do WordPress          |
+| `EMAIL_TO`        | Email(s) que receberão o relatório          |
+| `LOG_FILE`        | Caminho do arquivo de log                   |
+| `CONFIG_FILE`     | Caminho do arquivo `.ini` do Wordfence CLI  |
+| `DISCORD_WEBHOOK` | URL do webhook do Discord para notificações |
+
+Exemplo de `.env`:
+
+```dotenv
 WP_PATH="/var/www/wordpress"
 EMAIL_TO="seuemail@email.com"
-LOG_FILE="/var/log/wordfence_scan.log"
-EMAIL_SUBJECT="Relatório Wordfence - data"
+LOG_FILE="$HOME/.log/wordfence_scan.log"
 CONFIG_FILE="/home/administrador/.config/wordfence/wordfence-cli.ini"
-```
-
-## 🗒️ **Função de Log**
-
-Essa função serve pra registrar tudo que o script faz. Se der erro ou sucesso, ele escreve no arquivo de log para você poder investigar depois.
-
-```bash
-log() {
-    echo "data e hora + mensagem" >> arquivo_log
-}
-```
-
-```bash
-log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
-}
-```
-
-## 🧼 **Função `prepare()`**
-
-Antes de escanear, ele verifica se está tudo pronto:
-- Cria o arquivo de log (caso não exista)
-- Vê se o Wordfence está instalado
-- Se não estiver, mostra a mensagem “instale com: sudo dpkg -i wordfence.deb”
-
-```bash
-prepare() {
-    cria log
-    verifica se o comando "wordfence" existe
-    se não existir, mostra erro
-}
-```
-
-```bash
-prepare() {
-sudo touch "$LOG_FILE"
-sudo chown "$(whoami)":"$(whoami)" "$LOG_FILE"
-if ! command -v wordfence >/dev/null 2>&1; then
-log "ERROR: wordfence não encontrado"
-echo "ERROR: Instale com: sudo dpkg -i wordfence.deb"
-exit 1
-fi
-}
-```
-
-## 🔍 **Função `run_scan()`**
-
-O que está acontecendo aqui:
-- Ele escaneia o site com Wordfence.
-- Guarda o resultado: se foi tudo bem, se teve algum alerta ou se deu erro.
-- Pega as informações principais e cria um relatório.
-- Se puder enviar e-mail (se o comando `mail` estiver disponível), ele envia!
-
-```bash
-run_scan() {
-    roda o escaneamento
-    vê o resultado (sucesso, aviso ou erro)
-    salva no log
-    monta e envia o e-mail (se tiver o comando mail instalado)
-}
-```
-
-```bash
-run_scan() {
-log "Iniciando varredura Wordfence..."
-SCAN_RESULT=$(wordfence malware-scan "$WP_PATH" --config "$CONFIG_FILE" 2>&1)
-SCAN_EXIT=$?
-if [ "$SCAN_EXIT" -eq 0 ]; then
-STATUS="SUCESSO"
-elif [ "$SCAN_EXIT" -eq 1 ]; then
-STATUS="AVISO"
-else
-STATUS="ERRO"
-fi  
-log "Status: $STATUS - Código de saída: $SCAN_EXIT"
-log "Resultado da varredura: $SCAN_RESULT"
-if command -v mail >/dev/null 2>&1; then
-EMAIL_BODY="
-RELATORIO WORDFENCE
-────────────────────────────────────
-Data: $(date)
-Caminho: $WP_PATH
-Status: $STATUS
-────────────────────────────────────
-Resumo do Scan:
-────────────────────────────────────
-$(echo "$SCAN_RESULT" | grep -E "INFO|WARNING|ERROR")
-────────────────────────────────────
-Arquivos suspeitos detectados:
-──────────────────────────────────── 
-$(echo "$SCAN_RESULT" | grep -E "^/var/www/wordpress|Obfuscated")"
-echo "$EMAIL_BODY" | iconv -f utf-8 -t utf-8 | mail -s "$EMAIL_SUBJECT" "$EMAIL_TO"
-log "Email enviado para: $EMAIL_TO"
-else
-log "Comando 'mail' não disponível"
-fi 
-}
-```
-
-## 🧪 **Execução Principal**
-
-Você pode testar o script com:
-```bash
-./seu_script.sh --teste
-```
-
-Assim ele mostra informações extras e ainda executa a varredura.
-
-```bash
-chama a função prepare
-if [ "$1" = "--teste" ]; then
-    roda em modo de teste
-else
-    roda normalmente
-fi
-```
-
-```bash
-prepare
-if [ "$1" = "--teste" ]; then
-echo "=== MODO DE TESTE ==="
-echo "WordPress path: $WP_PATH"
-echo "Log file: $LOG_FILE"
-run_scan
-echo "=== Verifique email e log ==="
-else
-run_scan
-fi
+DISCORD_WEBHOOK="https://discord.com/api/webhooks/ID/AQUI"
 ```
 
 ---
@@ -163,12 +47,22 @@ fi
 Antes de tudo, verifique se os seguintes requisitos estão atendidos:
 
 - Wordfence CLI instalado (`wordfence.deb`)
-- Arquivo Wordpress posicionado corretamente (`wordpress.zip >> wordpress`)
+- Arquivo Wordpress posicionado corretamente (`wordpress`)
   de preferencia em `/var/www/aquivo_aqui`
-- Servidor de e-mail configurado com o comando `mail`
+-  Ferramentas: `jq`, `curl`, `mail`
 - WordPress instalado no caminho correto
 - Configuração do Wordfence em `/home/administrador/.config/wordfence/wordfence-cli.ini`
-- Permissão de execução no script:
+- Crie um webhook no canal desejado no Discord >> Copie a URL do webhook.
+
+Instale dependências:
+
+```bash
+sudo apt update
+sudo apt install jq curl mailutils
+```
+
+Permissão de execução no script:
+
   ```bash
   chmod +x ~/wordfence_scan.sh
   ```
@@ -192,33 +86,17 @@ Você pode configurar o `cron` para rodar o script **duas vezes por semana**, po
 - `* *`: qualquer dia e mês
 - `1,4`: segunda (1) e quinta (4)
 
-### 3. 📬 Envio Automático de E-mail
-
-Seu script já envia e-mails via o comando `mail`, mas certifique-se de que o servidor esteja configurado corretamente:
-
-- Para servidores simples, pode usar `sendmail` ou `mailutils`:
-  ```bash
-  sudo apt install mailutils
-  ```
-
-- Para configurações mais robustas, instale e configure `Postfix`:
-  ```bash
-  sudo apt install postfix
-  ```
-
-💡 Você também pode trocar o `mail` por `mutt`, `ssmtp`, ou integrar com serviços SMTP autenticados, caso deseje enviar por Gmail ou Outlook.
-
-### 4. 🧪 Executar Teste Manual
+### 3. 🧪 Executar Teste Manual
 
 Quando quiser executar uma varredura de teste com saída no terminal:
 
 ```bash
-./seu_script.sh --teste
+./wordfence_scan.sh --teste
 ```
 
 Isso roda o scan, imprime informações no terminal, e também registra no log e envia o e-mail conforme o script.
 
-### 5. 📄 Verificando Logs
+### 4. 📄 Verificando Logs
 
 Após cada execução, o log estará disponível em:
 
@@ -275,8 +153,6 @@ Pode configurar isso pra você com:
 - Gmail 
 - Outlook
 - Servidores SMTP 
-
----
 
 ## 🛠️ Passo a passo para configurar `msmtp` com Gmail (ou outro SMTP)
 
@@ -342,6 +218,36 @@ echo "$EMAIL_BODY" | iconv -f utf-8 -t utf-8 | msmtp "$EMAIL_TO"
 
 ---
 
-## Modelo do Email enviado pela aplicação
+## 📬 Exemplo de Notificação (Email ou Discord)
 
-![Email Enviado](image/mail-send.png)
+```text
+RELATÓRIO WORDFENCE
+────────────────────────────────────
+
+Data: 2025-07-16
+Caminho: /var/www/wordpress
+Status: AVISO
+
+────────────────────────────────────
+
+Resumo do Scan:
+WARNING: Plugin 'xyz' desatualizado
+INFO: Nenhum malware encontrado
+...
+
+────────────────────────────────────
+
+Arquivos suspeitos detectados:
+/var/www/wordpress/wp-content/xyz.php
+Obfuscated code detected
+...
+```
+
+---
+
+## 🧠 Observações Finais
+
+- 🛡️ Ideal para monitorar sites WordPress com segurança em segundo plano
+- 🎯 Pode ser adaptado para escanear múltiplas instalações WordPress
+- 💬 Discord é perfeito para integrar com canais de sysadmin ou DevOps
+
