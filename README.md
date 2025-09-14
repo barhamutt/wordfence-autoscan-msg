@@ -1,253 +1,112 @@
-# 🔐 Wordfence CLI Scan Automation + Email & Discord Notification
+# 🛡️ Wordfence Scan Automático com Notificações
 
-![Wordfence](image/wordfence.png)
+Este script Bash foi desenvolvido para reforçar a segurança de ambientes WordPress em servidores web. Utilizando o Wordfence CLI, ele realiza varreduras automatizadas em busca de vulnerabilidades. Ao final do processo, gera um relatório detalhado e envia notificações para os administradores via e-mail, Discord e Telegram.
 
-Este script realiza varreduras de segurança em instalações WordPress usando o **Wordfence CLI**, envia relatórios por **e-mail** e também notifica via **Discord webhook**. Ideal para administradores que desejam monitorar a integridade de seus sites automaticamente.
 
----
 
-## 🧠 O que esse script faz?
+## 📁 Estrutura do Projeto
 
-- Executa uma varredura de malware com o Wordfence CLI.
-- Gera um relatório com os principais alertas e arquivos suspeitos.
-- Envia esse relatório por e-mail.
-- Notifica via Discord (se o relatório tiver até 2000 caracteres).
-- Registra logs locais para auditoria.
+O projeto está organizado da seguinte forma:
+```
+wordfence-autoscan-msg/                     
+├── lab/                          
+│   ├── Laboratório Servidor ... - Part1.md
+│   ├── Laboratório Servidor ... - Part2.md
+│   └── Laboratório Servidor ... - Part3.md
+├── scripts/                      
+│   ├── full-version/            
+│   │   ├── wordfence-autoscan.sh
+│   │   └── wordfence-autoscan.uml
+│   └── minimal-version/        
+│       ├── wordfence-discord.sh
+│       ├── wordfence-email.sh
+│       └── wordfence-telegram.sh
+└── README.md
+```
 
----
 
-## ⚙️ Configurações Básicas
 
-Você pode configurar os seguintes parâmetros diretamente no script ou via arquivo `.env`:
+## ⚙️ Requisitos
 
-| Variável          | Descrição                                   |
-| ----------------- | ------------------------------------------- |
-| `WP_PATH`         | Caminho da instalação do WordPress          |
-| `EMAIL_TO`        | Email(s) que receberão o relatório          |
-| `LOG_FILE`        | Caminho do arquivo de log                   |
-| `CONFIG_FILE`     | Caminho do arquivo `.ini` do Wordfence CLI  |
-| `DISCORD_WEBHOOK` | URL do webhook do Discord para notificações |
+- **Wordfence CLI** instalado e disponível no `PATH`
+- **Ferramentas de sistema**:
+    - `curl` - para chamadas HTTP (Discord e Telegram)
+    - `jq` - para formatação JSON (Discord)
+    - `mail`- para envio de e-mail via terminal 
+    - `cron` - para execuções de rotina
 
-Exemplo de `.env`:
+>Se for utilizar o Gmail como servidor de saída, é necessário configurar o SMTP Relay no Postfix previamente.
 
-```dotenv
-WP_PATH="/var/www/wordpress"
+>Exemplos e dicas de configuração estão disponíveis em wordfence-autoscan-msg/lab.
+
+
+
+## 🚀 Como usar
+
+1. Clone o script para seu servidor:
+
+```bash
+git clone git@github.com:barmtt/wordfence-autoscan-msg.git
+```
+
+2. Mova o `script` para o diretorio `bin/` e atribua a ele permissões de execução:
+
+```bash
+sudo mv wordfence_autoscan.sh /usr/local/bin/wordfence_autoscan.sh
+sudo chmod +x /usr/local/bin/wordfence_autoscan.sh
+```  
+
+>Com isso, o script passou a estar disponível como um comando direto no terminal
+
+3. Edite as variáveis de configuração no início do script:
+
+```bash
+sudo nano /usr/local/bin/wordfence-autoscan.sh
+```
+```bash
 EMAIL_TO="seuemail@email.com"
-LOG_FILE="$HOME/.log/wordfence_scan.log"
-CONFIG_FILE="/home/administrador/.config/wordfence/wordfence-cli.ini"
-DISCORD_WEBHOOK="https://discord.com/api/webhooks/ID/AQUI"
+DISCORD_WEBHOOK_ID="ID_AQUI"
+DISCORD_WEBHOOK_TOKEN="TOKEN_AQUI"
+TELEGRAM_CHAT_ID="ID_AQUI"
+TELEGRAM_TOKEN="TOKEN_AQUI"
+WP_PATH="/var/www/html/wordpress"
 ```
 
----
-
-# 🛠️ Guia de Implementação do Script Wordfence
-
-### 1. 📁 Preparando o Ambiente
-
-Antes de tudo, verifique se os seguintes requisitos estão atendidos:
-
-- Wordfence CLI instalado (`wordfence.deb`)
-- Arquivo Wordpress posicionado corretamente (`wordpress`)
-  de preferencia em `/var/www/aquivo_aqui`
--  Ferramentas: `jq`, `curl`, `mail`
-- WordPress instalado no caminho correto
-- Configuração do Wordfence em `/home/administrador/.config/wordfence/wordfence-cli.ini`
-- Crie um webhook no canal desejado no Discord >> Copie a URL do webhook.
-
-Instale dependências:
+4. Configure o agendamento da execução do `script` com o `cron job`:
 
 ```bash
-sudo apt update
-sudo apt install jq curl mailutils
+crontab -e
 ```
-
-Permissão de execução no script:
-
-  ```bash
-  chmod +x ~/wordfence_scan.sh
-  ```
-
-### 2. 🕒 Agendar Execução Semanal com Cron
-
-Você pode configurar o `cron` para rodar o script **duas vezes por semana**, por exemplo, **segunda e quinta às 2h da manhã**.
-
-1. Edite o crontab:
-   ```bash
-   crontab -e
-   ```
-
-2. Adicione esta linha:
-   ```bash
-   0 2 * * 1,4 ~/wordfence_scan.sh
-   ```
-
-🔎 Explicação:
-- `0 2`: às 02:00
-- `* *`: qualquer dia e mês
-- `1,4`: segunda (1) e quinta (4)
-
-### 3. 🧪 Executar Teste Manual
-
-Quando quiser executar uma varredura de teste com saída no terminal:
-
 ```bash
-./wordfence_scan.sh --teste
+0 3 * * * /usr/local/bin/wordfence-autoscan.sh
+```
+> Essa configuração agenda a execução automática do script todos os dias às **03:00 da manhã**, garantindo que os escaneamentos sejam realizados regularmente e os alertas enviados conforme necessário.
+
+
+
+## 📂 Estrutura do Relatório
+
+O relatório contém:
+
+- Data e hora da execução
+- Caminho escaneado
+- Resultado da varredura de malware
+- Resultado da varredura de vulnerabilidades
+
+
+
+## 📝 Log
+
+Os logs são salvos em:
+
+```
+~/.log/wordfence_scan.log
 ```
 
-Isso roda o scan, imprime informações no terminal, e também registra no log e envia o e-mail conforme o script.
 
-### 4. 📄 Verificando Logs
-
-Após cada execução, o log estará disponível em:
-
-```bash
-cat /var/log/wordfence_scan.log
-```
-
-Você pode acompanhar alertas e identificar arquivos suspeitos diretamente por ali.
-
----
-
-# Observação :
-
-## 📪 Casos em que o E-mail não chega ou fica preso...
-
-#### 🧪 1. Teste básico com remetente definido
-
-Tenta rodar isso:
-
-```bash
-echo "Teste manual do sistema de email" | mail -s "Teste Wordfence" -r administrador@localhost seuemail@email.com
-```
-
-Isso força o remetente como `administrador@localhost`, que às vezes é necessário pra não ser rejeitado pelo servidor de destino.
-
-### 📨 2. Verifique fila de emails locais
-
-Seu sistema pode estar tentando enviar, mas os emails estão presos. Veja:
-
-```bash
-mailq
-```
-
-Se aparecer uma fila, o problema pode ser na entrega (falta de DNS reverso, rejeição do email, etc.)
-
-## 🚫 Por que o E-Mail não responde?
-
-A  maioria dos provedores modernos **bloqueia conexões diretas por segurança**. Se seu servidor não tiver:
-
-- IP fixo com reputação confiável
-- DNS reverso (PTR record) configurado
-- SPF, DKIM e DMARC válidos
-
-... ele vai dar time-out toda vez 
-
-## 💡 Solução: usar SMTP autenticado
-
-### ➤ `msmtp` + Gmail, Outlook ou outro servidor SMTP
-
-Com ele, seu script manda e-mail autenticado, usando um servidor de verdade — sem depender de porta 25 bloqueada.
-
-Pode configurar isso pra você com:
-
-- Gmail 
-- Outlook
-- Servidores SMTP 
-
-## 🛠️ Passo a passo para configurar `msmtp` com Gmail (ou outro SMTP)
-
-### 1. 📦 Instalar o `msmtp` e o agente de envio
-
-```bash
-sudo apt update
-sudo apt install msmtp msmtp-mta
-```
-
-### 2. 🗂️ Criar arquivo de configuração personalizado
-
-Crie o arquivo `~/.msmtprc`:
-
-```bash
-nano ~/.msmtprc
-```
-
-E cole algo como isso para Gmail:
-
-```ini
-# Arquivo de configuração do msmtp
-defaults
-auth           on
-tls            on
-tls_trust_file /etc/ssl/certs/ca-certificates.crt
-logfile        ~/.msmtp.log
-
-account        email
-host           smtp.email.com
-port           587
-from           seuemail@email.com
-user           seuemail@email.com
-password       sua_senha_de_aplicativo
-account default : email
-```
-
-> 💡 **Importante:** Para Gmail, você precisa gerar uma **senha de aplicativo** em [https://myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords). Isso funciona mesmo se a verificação em duas etapas estiver ativada.
-
-📧 Se for usar gmail, Outlook, Yahoo, ou servidor da empresa mude o template...
-
-### 3. 🔐 Ajustar permissões
-
-O arquivo deve ser acessível apenas por você:
-
-```bash
-chmod 600 ~/.msmtprc
-```
-
-### 4. 🧪 Testar envio manual
-
-```bash
-echo "Testando envio via msmtp" | msmtp seuemail@hotmail.com
-```
-
-## 🔁 Integrar ao seu script
-
-Basta substituir o trecho do `mail` por:
-
-```bash
-echo "$EMAIL_BODY" | iconv -f utf-8 -t utf-8 | msmtp "$EMAIL_TO"
-```
-
----
-
-## 📬 Exemplo de Notificação (Email ou Discord)
-
-```text
-RELATÓRIO WORDFENCE
-────────────────────────────────────
-
-Data: 2025-07-16
-Caminho: /var/www/wordpress
-Status: AVISO
-
-────────────────────────────────────
-
-Resumo do Scan:
-WARNING: Plugin 'xyz' desatualizado
-INFO: Nenhum malware encontrado
-...
-
-────────────────────────────────────
-
-Arquivos suspeitos detectados:
-/var/www/wordpress/wp-content/xyz.php
-Obfuscated code detected
-...
-```
-
----
 
 ## 🧠 Observações Finais
 
-- 🛡️ Ideal para monitorar sites WordPress com segurança em segundo plano
-- 🎯 Pode ser adaptado para escanear múltiplas instalações WordPress
-- 💬 Discord é perfeito para integrar com canais de sysadmin ou DevOps
-
+- Pode ser ideal para monitorar sites WordPress com segurança em segundo plano
+- Pode ser adaptado para escanear múltiplas instalações WordPress
+- Discord é perfeito para integrar com canais de sysadmin ou DevOps

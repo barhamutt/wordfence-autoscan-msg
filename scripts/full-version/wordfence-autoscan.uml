@@ -1,0 +1,57 @@
+@startuml
+start
+
+:Definir variáveis de configuração:
+- WP_PATH
+- EMAIL_TO
+- LOG_FILE
+- DISCORD_WEBHOOK_ID
+- DISCORD_WEBHOOK_TOKEN
+- DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/$DISCORD_WEBHOOK_ID/$DISCORD_WEBHOOK_TOKEN"
+- TELEGRAM_TOKEN
+- TELEGRAM_CHAT_ID
+- DATA;
+
+:Definir função log(mensagem);
+:Definir função send_discord(mensagem);
+:Definir função send_telegram(mensagem);
+:Definir função prepare();
+:Definir função run_scan();
+
+:Executar prepare();
+
+if (Wordfence CLI instalado?) then
+  :Criar diretório e arquivo de log;
+else
+  :Exibir erro "Instale o Wordfence CLI";
+  stop
+endif
+
+:Executar run_scan();
+:Registrar "Iniciando scans..." no log;
+
+:Executar malware scan;
+:MALWARE = wordfence malware-scan WP_PATH --include-all-files --verbose;
+
+:Executar vulnerability scan;
+:VULN = wordfence vuln-scan WP_PATH --verbose;
+
+:Montar relatório:
+- Data e caminho
+- Resultado do malware scan
+- Resultado do vulnerability scan;
+
+:Enviar relatório por e-mail;
+
+if (Relatório <= 2000 caracteres) then
+  :Enviar relatório para Discord;
+endif
+
+if (Relatório <= 4096 caracteres) then
+  :Enviar relatório para Telegram;
+endif
+
+:Registrar "Relatório enviado." no log;
+
+stop
+@enduml
