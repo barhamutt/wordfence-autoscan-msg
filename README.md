@@ -46,7 +46,7 @@ wordfence-autoscan-msg/
 1. Clone o script para seu servidor:
 
 ```bash
-git clone git@github.com:barmtt/wordfence-autoscan-msg.git
+git clone git@github.com:barhamutt/wordfence-autoscan-msg.git
 ```
 
 2. Mova o `script` para o diretorio `bin/` e atribua a ele permissões de execução:
